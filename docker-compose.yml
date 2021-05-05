@@ -1,0 +1,73 @@
+version: "3.8"
+
+services:
+
+  postgres:
+    image: postgres
+    container_name: postgresdb
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: ports-db
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - $PWD/local/postgresql/data:/var/lib/postgresql/data
+      - $PWD/ports-domain-service/init_tables.sql:/docker-entrypoint-initdb.d/init.sql
+
+  pgadmin:
+    container_name: pgadmin
+    image: dpage/pgadmin4
+
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+
+    volumes:
+      - $PWD/local/pgadmin:/var/lib/pgadmin
+
+    ports:
+      - 5050:80
+
+    restart: unless-stopped
+    depends_on:
+      - postgres
+
+  ports-domain-service:
+    image: ports-domain-service
+    container_name: ports-domain-service
+    environment: 
+      APP_LOG_LEVEL: DEBUG
+      APP_PRETTY_LOG: 'false'
+      
+      APP_GRPC_ADDRESS: ':8081'
+      
+      APP_POSTGRES_USER: postgres
+      APP_POSTGRES_PASSWORD: pass
+      APP_POSTGRES_HOST: postgres
+      APP_POSTGRES_PORT: 5432
+      APP_POSTGRES_DB_NAME: ports-db
+      APP_POSTGRES_MAX_CONN: 10
+      APP_POSTGRES_SSL: 'false'
+    
+    depends_on: 
+      - postgres
+
+
+  ports-api:
+    image: ports-api
+    container_name: ports-api
+    environment: 
+      APP_LOG_LEVEL: DEBUG
+      APP_PRETTY_LOGS: 'false'
+      APP_HTTP_ADDRESS: ':8080'
+      APP_ROOT_TEMPLATE_FILE: './root.html'
+      APP_SINK_BATCH_SIZE: 20
+      APP_PORTS_DOMAIN_SERVICE_ADDRESS: 'ports-domain-service:8081'
+
+    ports:
+      - 8080:8080
+
+    depends_on: 
+      - ports-domain-service
